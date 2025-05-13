@@ -1,0 +1,43 @@
+#include <windows.h>
+#include <stdio.h>
+
+typedef HGLOBAL(__fastcall* ReadJPG2000_W_Type)(
+    const wchar_t*, int, __int64, __int64, DWORD*, DWORD*);
+
+// WinAFL이 호출할 하네스 함수
+extern "C" __declspec(dllexport) int fuzzme(char* filename) {
+    HMODULE jpeg2000 = LoadLibraryA("JPEG2000.dll");
+    if (!jpeg2000) return 0;
+
+    ReadJPG2000_W_Type func = (ReadJPG2000_W_Type)GetProcAddress(jpeg2000, "ReadJPG2000_W");
+    if (!func) return 0;
+
+    wchar_t widePath[MAX_PATH];
+    MultiByteToWideChar(CP_ACP, 0, filename, -1, widePath, MAX_PATH);
+
+    wchar_t arg3[0x200] = { 0 };
+    wchar_t arg4[0x200] = { 0 };
+    DWORD arg5 = 0;
+    DWORD arg6 = 0;
+
+    HGLOBAL result = func(
+        widePath,
+        0,
+        (__int64)arg3,
+        (__int64)arg4,
+        &arg5,
+        &arg6
+    );
+
+    if (result != NULL) {
+        GlobalFree(result);
+    }
+
+    return 0;
+}
+
+// 일반 실행용 main 함수 (WinAFL 없이도 실행 가능)
+int main(int argc, char* argv[]) {
+
+    return fuzzme(argv[1]);
+}
